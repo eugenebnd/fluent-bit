@@ -28,14 +28,14 @@ jobs:
 
       - name: Build a docker image for master branch
         run: |
-          DOCKER_BUILDKIT=1 docker build --no-cache -f ./dockerfiles/Dockerfile.${{ env.arch }}-1_7 -t egnbnd/fluent-bit:${{ env.arch }}-1_7 .
+          DOCKER_BUILDKIT=1 docker build --no-cache -f ./dockerfiles/Dockerfile.${{ env.arch }}-1_7 -t egnbnd/fluent-bit:1.7.1-systemd-v246 .
         env:
           arch: x86_64
           dockerhub_organization: fluentbitdev
 
       - name: Push image to Docker Hub
         run: |
-          DOCKER_BUILDKIT=1 docker push egnbnd/fluent-bit:${{ env.arch }}-1_7
+          DOCKER_BUILDKIT=1 docker push egnbnd/fluent-bit:1.7.1-systemd-v246
         env:
           arch: x86_64
           dockerhub_organization: fluentbitdev
