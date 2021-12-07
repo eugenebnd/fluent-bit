@@ -1,4 +1,4 @@
-FROM debian:buster-slim as builder
+FROM amd64/debian:buster-slim as builder
 
 # Fluent Bit version
 ENV FLB_MAJOR 1
@@ -12,8 +12,8 @@ RUN mkdir -p /fluent-bit/bin /fluent-bit/etc /fluent-bit/log /tmp/fluent-bit-mas
 
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list
-RUN apt-get update && \
+RUN echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/backports.list && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
     curl \
@@ -24,7 +24,7 @@ RUN apt-get update && \
     libssl-dev \
     libsasl2-dev \
     pkg-config \
-    libsystemd-dev \
+    libsystemd-dev/buster-backports \
     zlib1g-dev \
     libpq-dev \
     postgresql-server-dev-all \
@@ -37,12 +37,10 @@ RUN apt-get update && \
     && rm -rf /tmp/fluent-bit/build/*
 
 WORKDIR /tmp/fluent-bit/build/
-
-RUN cmake -DFLB_DEBUG=On \
+RUN cmake -DFLB_RELEASE=On \
           -DFLB_TRACE=Off \
           -DFLB_JEMALLOC=On \
           -DFLB_TLS=On \
-          -DFLB_HTTP_CLIENT_DEBUG=On \
           -DFLB_SHARED_LIB=Off \
           -DFLB_EXAMPLES=Off \
           -DFLB_HTTP_SERVER=On \
@@ -69,9 +67,10 @@ COPY --from=amd64/busybox:1.31.1 /bin/busybox /bin/busybox
 RUN chmod 555 /bin/busybox && \
     /bin/busybox --install -s /usr/local/bin
 
-FROM amd64/debian:buster-slim
+FROM gcr.io/distroless/cc-debian10
 MAINTAINER Eduardo Silva <eduardo@treasure-data.com>
-LABEL Description="Fluent Bit docker image for testing branch master" Vendor="Fluent Organization" Version="1.1"
+LABEL Description="Fluent Bit docker image" Vendor="Fluent Organization" Version="1.1"
+
 RUN true
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -87,6 +86,7 @@ COPY --from=builder /usr/lib/x86_64-linux-gnu/libz* /usr/lib/x86_64-linux-gnu/
 COPY --from=builder /lib/x86_64-linux-gnu/libz* /lib/x86_64-linux-gnu/
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libssl.so* /usr/lib/x86_64-linux-gnu/
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libcrypto.so* /usr/lib/x86_64-linux-gnu/
+
 # These below are all needed for systemd
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libsystemd* /usr/lib/x86_64-linux-gnu/
 COPY --from=builder /lib/x86_64-linux-gnu/libselinux.so* /lib/x86_64-linux-gnu/
@@ -117,6 +117,9 @@ COPY --from=builder /fluent-bit /fluent-bit
 
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 COPY --from=builder /bin/busybox /bin/
+
+#
+EXPOSE 2020
 
 # Entry point
 CMD ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/fluent-bit.conf"]
