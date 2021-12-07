@@ -31,14 +31,14 @@ jobs:
           DOCKER_BUILDKIT=1 docker build --no-cache -f ./dockerfiles/Dockerfile.${{ env.arch }}-1_8 -t ${{ env.dockerhub_organization }}/fluent-bit:${{ env.arch }}-1_8 .
         env:
           arch: x86_64
-          dockerhub_organization: fluentbitdev
+          dockerhub_organization: egnbnd
 
       - name: Push image to Docker Hub
         run: |
           DOCKER_BUILDKIT=1 docker push ${{ env.dockerhub_organization }}/fluent-bit:${{ env.arch }}-1_8
         env:
           arch: x86_64
-          dockerhub_organization: fluentbitdev
+          dockerhub_organization: egnbnd
   run-integration-tests:
     name: run integration tests on GCP - k8s ${{ matrix.k8s-release }} for 1.8 branch
     needs: docker_build
