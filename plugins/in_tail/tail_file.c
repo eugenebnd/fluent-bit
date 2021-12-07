@@ -326,6 +326,7 @@ static int process_content(struct flb_tail_file *file, size_t *bytes)
 
     while (data < end && (p = memchr(data, '\n', end - data))) {
         len = (p - data);
+        crlf = 0;
         if (file->skip_next == FLB_TRUE) {
             data += len + 1;
             processed_bytes += len + 1;
@@ -787,11 +788,14 @@ int flb_tail_file_append(char *path, struct stat *st, int mode,
     int fd;
     int ret;
     uint64_t stream_id;
+    uint64_t ts;
     size_t len;
     char *tag;
+    char *name;
     size_t tag_len;
     struct flb_tail_file *file;
     struct stat lst;
+    flb_sds_t inode_str;
 
     if (!S_ISREG(st->st_mode)) {
         return -1;
@@ -879,18 +883,30 @@ int flb_tail_file_append(char *path, struct stat *st, int mode,
 
     /* Multiline core mode */
     if (ctx->ml_ctx) {
+        /*
+         * Create inode str to get stream_id.
+         *
+         * If stream_id is created by filename,
+         * it will be same after file rotation and it causes invalid destruction.
+         * https://github.com/fluent/fluent-bit/issues/4190
+         *
+         */
+        inode_str = flb_sds_create_size(64);
+        flb_sds_printf(&inode_str, "%"PRIu64, file->inode);
         /* Create a stream for this file */
         ret = flb_ml_stream_create(ctx->ml_ctx,
-                                   file->name, file->name_len,
+                                   inode_str, flb_sds_len(inode_str),
                                    ml_flush_callback, file,
                                    &stream_id);
         if (ret != 0) {
             flb_plg_error(ctx->ins,
                           "could not create multiline stream for file: %s",
-                          file->name);
+                          inode_str);
+            flb_sds_destroy(inode_str);
             goto error;
         }
         file->ml_stream_id = stream_id;
+        flb_sds_destroy(inode_str);
     }
 
     /* Local buffer */
@@ -961,6 +977,11 @@ int flb_tail_file_append(char *path, struct stat *st, int mode,
     file->pending_bytes = file->size - file->offset;
 
 #ifdef FLB_HAVE_METRICS
+    name = (char *) flb_input_name(ctx->ins);
+    ts = cmt_time_now();
+    cmt_counter_inc(ctx->cmt_files_opened, ts, 1, (char *[]) {name});
+
+    /* Old api */
     flb_metrics_sum(FLB_TAIL_METRIC_F_OPENED, 1, ctx->ins->metrics);
 #endif
 
@@ -986,6 +1007,8 @@ error:
 
 void flb_tail_file_remove(struct flb_tail_file *file)
 {
+    uint64_t ts;
+    char *name;
     struct flb_tail_config *ctx;
 
     ctx = file->config;
@@ -1031,6 +1054,11 @@ void flb_tail_file_remove(struct flb_tail_file *file)
     flb_free(file->real_name);
 
 #ifdef FLB_HAVE_METRICS
+    name = (char *) flb_input_name(ctx->ins);
+    ts = cmt_time_now();
+    cmt_counter_inc(ctx->cmt_files_closed, ts, 1, (char *[]) {name});
+
+    /* old api */
     flb_metrics_sum(FLB_TAIL_METRIC_F_CLOSED, 1, ctx->ins->metrics);
 #endif
 
@@ -1453,7 +1481,9 @@ int flb_tail_file_name_dup(char *path, struct flb_tail_file *file)
 int flb_tail_file_rotated(struct flb_tail_file *file)
 {
     int ret;
+    uint64_t ts;
     char *name;
+    char *i_name;
     char *tmp;
     struct stat st;
     struct flb_tail_config *ctx = file->config;
@@ -1488,6 +1518,11 @@ int flb_tail_file_rotated(struct flb_tail_file *file)
 #endif
 
 #ifdef FLB_HAVE_METRICS
+        i_name = (char *) flb_input_name(ctx->ins);
+        ts = cmt_time_now();
+        cmt_counter_inc(ctx->cmt_files_rotated, ts, 1, (char *[]) {i_name});
+
+        /* OLD api */
         flb_metrics_sum(FLB_TAIL_METRIC_F_ROTATED,
                         1, file->config->ins->metrics);
 #endif

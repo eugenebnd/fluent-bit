@@ -45,6 +45,11 @@ else()
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=__FILE__")
 endif()
 
+if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "armv7l")
+  set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} -latomic")
+  set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -latomic")
+endif()
+
 include(GNUInstallDirs)
 include(ExternalProject)
 include(cmake/FindJournald.cmake)
@@ -96,21 +101,23 @@ option(FLB_AVRO_ENCODER        "Build with Avro encoding support" No)
 option(FLB_AWS_ERROR_REPORTER  "Build with aws error reporting support" No)
 option(FLB_ARROW               "Build with Apache Arrow support"  No)
 
-# Metrics: Experimental Feature, disabled by default on 0.12 series
-# but enabled in the upcoming 0.13 release. Note that development
-# mode enable this feature.
-option(FLB_METRICS            "Enable metrics support"       No)
+# Native Metrics Support (cmetrics)
+option(FLB_METRICS            "Enable metrics support"       Yes)
 
 # Proxy Plugins
 option(FLB_PROXY_GO           "Enable Go plugins support"   Yes)
 
-# Build-in Plugins
+# Built-in Custom Plugins
+option(FLB_CUSTOM_CALYPTIA    "Enable Calyptia Support"      Yes)
+
+# Built-in Plugins
 option(FLB_IN_CPU             "Enable CPU input plugin"             Yes)
 option(FLB_IN_THERMAL         "Enable Thermal plugin"               Yes)
 option(FLB_IN_DISK            "Enable Disk input plugin"            Yes)
 option(FLB_IN_DOCKER          "Enable Docker input plugin"          Yes)
 option(FLB_IN_DOCKER_EVENTS   "Enable Docker events input plugin"   Yes)
 option(FLB_IN_EXEC            "Enable Exec input plugin"            Yes)
+option(FLB_IN_FLUENTBIT_METRICS "Enable Fluent Bit metrics  plugin" Yes)
 option(FLB_IN_FORWARD         "Enable Forward input plugin"         Yes)
 option(FLB_IN_HEALTH          "Enable Health input plugin"          Yes)
 option(FLB_IN_HTTP            "Enable HTTP input plugin"            Yes)
@@ -128,6 +135,7 @@ option(FLB_IN_HEAD            "Enable Head input plugin"            Yes)
 option(FLB_IN_PROC            "Enable Process input plugin"         Yes)
 option(FLB_IN_SYSTEMD         "Enable Systemd input plugin"         Yes)
 option(FLB_IN_DUMMY           "Enable Dummy input plugin"           Yes)
+option(FLB_IN_NGINX_EXPORTER_METRICS "Enable Nginx Metrics input plugin" Yes)
 option(FLB_IN_NETIF           "Enable NetworkIF input plugin"       Yes)
 option(FLB_IN_WINLOG          "Enable Windows Log input plugin"      No)
 option(FLB_IN_WINSTAT         "Enable Windows Stat input plugin"     No)
@@ -139,6 +147,7 @@ option(FLB_IN_NODE_EXPORTER_METRICS "Enable node exporter metrics input plugin" 
 option(FLB_OUT_AZURE          "Enable Azure output plugin"          Yes)
 option(FLB_OUT_AZURE_BLOB     "Enable Azure output plugin"          Yes)
 option(FLB_OUT_BIGQUERY       "Enable BigQuery output plugin"       Yes)
+option(FLB_OUT_CALYPTIA       "Enable Calyptia monitoring plugin"   Yes)
 option(FLB_OUT_COUNTER        "Enable Counter output plugin"        Yes)
 option(FLB_OUT_DATADOG        "Enable DataDog output plugin"        Yes)
 option(FLB_OUT_ES             "Enable Elasticsearch output plugin"  Yes)
@@ -176,6 +185,7 @@ option(FLB_OUT_S3             "Enable AWS S3 output plugin"         Yes)
 option(FLB_OUT_WEBSOCKET      "Enable Websocket output plugin"      Yes)
 option(FLB_FILTER_ALTER_SIZE  "Enable alter_size filter"            Yes)
 option(FLB_FILTER_AWS         "Enable aws filter"                   Yes)
+option(FLB_FILTER_CHECKLIST   "Enable checklist filter"             Yes)
 option(FLB_FILTER_EXPECT      "Enable expect filter"                Yes)
 option(FLB_FILTER_GREP        "Enable grep filter"                  Yes)
 option(FLB_FILTER_MODIFY      "Enable modify filter"                Yes)
@@ -216,6 +226,7 @@ if(FLB_ALL)
   set(FLB_IN_DISK      1)
   set(FLB_IN_DUMMY     1)
   set(FLB_IN_NETIF     1)
+  set(FLB_IN_NGINX_STATUS 1)
   set(FLB_IN_EXEC      1)
 
   # Output plugins
@@ -308,7 +319,9 @@ if(FLB_COVERAGE)
 endif()
 
 # Enable Debug symbols if specified
-if(FLB_DEBUG)
+if(MSVC)
+  set(CMAKE_BUILD_TYPE None)  # Avoid flag conflicts (See CMakeList.txt:L18)
+elseif(FLB_DEBUG)
   set(CMAKE_BUILD_TYPE "Debug")
 elseif(FLB_RELEASE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
@@ -606,6 +619,21 @@ check_c_source_compiles("
   }" FLB_HAVE_UNIX_SOCKET)
 if(FLB_HAVE_UNIX_SOCKET)
   FLB_DEFINITION(FLB_HAVE_UNIX_SOCKET)
+endif()
+
+# check attribute alloc_size
+check_c_source_compiles("
+#include <stdlib.h>
+__attribute__ ((alloc_size(1, 2))) static void* f(size_t a, size_t b) {
+    return calloc(a, b);
+}
+int main() {
+    f(1, 2);
+    return 0;
+}
+" FLB_HAVE_ATTRIBUTE_ALLOC_SIZE)
+if(FLB_HAVE_ATTRIBUTE_ALLOC_SIZE)
+  FLB_DEFINITION(FLB_HAVE_ATTRIBUTE_ALLOC_SIZE)
 endif()
 
 # Build tools/xxd-c

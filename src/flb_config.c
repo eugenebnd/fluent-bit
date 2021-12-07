@@ -136,6 +136,14 @@ struct flb_service_config service_configs[] = {
      FLB_CONF_TYPE_INT,
      offsetof(struct flb_config, coro_stack_size)},
 
+    /* Scheduler */
+    {FLB_CONF_STR_SCHED_CAP,
+     FLB_CONF_TYPE_INT,
+     offsetof(struct flb_config, sched_cap)},
+    {FLB_CONF_STR_SCHED_BASE,
+     FLB_CONF_TYPE_INT,
+     offsetof(struct flb_config, sched_base)},
+
 #ifdef FLB_HAVE_STREAM_PROCESSOR
     {FLB_CONF_STR_STREAMS_FILE,
      FLB_CONF_TYPE_STR,
@@ -174,6 +182,7 @@ struct flb_config *flb_config_init()
     config->kernel       = flb_kernel_info();
     config->verbose      = 3;
     config->grace        = 5;
+    config->grace_count  = 0;
     config->exit_status_code = 0;
 
 #ifdef FLB_HAVE_HTTP_SERVER
@@ -202,6 +211,9 @@ struct flb_config *flb_config_init()
     config->storage_path = NULL;
     config->storage_input_plugin = NULL;
 
+    config->sched_cap  = FLB_SCHED_CAP;
+    config->sched_base = FLB_SCHED_BASE;
+
 #ifdef FLB_HAVE_SQLDB
     mk_list_init(&config->sqldb_list);
 #endif
@@ -219,10 +231,13 @@ struct flb_config *flb_config_init()
 
     /* Initialize linked lists */
     mk_list_init(&config->collectors);
+    mk_list_init(&config->custom_plugins);
+    mk_list_init(&config->custom_plugins);
     mk_list_init(&config->in_plugins);
     mk_list_init(&config->parser_plugins);
     mk_list_init(&config->filter_plugins);
     mk_list_init(&config->out_plugins);
+    mk_list_init(&config->customs);
     mk_list_init(&config->inputs);
     mk_list_init(&config->parsers);
     mk_list_init(&config->filters);
@@ -230,12 +245,12 @@ struct flb_config *flb_config_init()
     mk_list_init(&config->proxies);
     mk_list_init(&config->workers);
     mk_list_init(&config->upstreams);
+    mk_list_init(&config->cmetrics);
 
     memset(&config->tasks_map, '\0', sizeof(config->tasks_map));
 
     /* Environment */
     config->env = flb_env_create();
-
 
     /* Multiline core */
     mk_list_init(&config->multiline_parsers);

@@ -45,9 +45,11 @@ struct flb_config {
 
     int support_mode;         /* enterprise support mode ?      */
     int is_ingestion_active;  /* date ingestion active/allowed  */
+    int is_shutting_down;     /* is the service shutting down ? */
     int is_running;           /* service running ?              */
     double flush;             /* Flush timeout                  */
-    int grace;                /* Grace on shutdown              */
+    int grace;                /* Maximum grace time on shutdown */
+    int grace_count;          /* Count of grace shutdown tries  */
     flb_pipefd_t flush_fd;    /* Timer FD associated to flush   */
 
     int daemon;               /* Run as a daemon ?              */
@@ -86,10 +88,14 @@ struct flb_config {
     void *dso_plugins;
 
     /* Plugins references */
+    struct mk_list custom_plugins;
     struct mk_list in_plugins;
     struct mk_list parser_plugins;      /* not yet implemented */
     struct mk_list filter_plugins;
     struct mk_list out_plugins;
+
+    /* Custom instances */
+    struct mk_list customs;
 
     /* Inputs instances */
     struct mk_list inputs;
@@ -140,6 +146,12 @@ struct flb_config {
 #ifdef FLB_HAVE_METRICS
     void *metrics;
 #endif
+
+    /*
+     * CMetric lists: a linked list to keep a reference of every
+     * cmetric context created.
+     */
+    struct mk_list cmetrics;
 
     /* HTTP Server */
 #ifdef FLB_HAVE_HTTP_SERVER
@@ -222,6 +234,8 @@ struct flb_config {
     uint16_t in_table_id[512];
 
     void *sched;
+    unsigned int sched_cap;
+    unsigned int sched_base;
 
     struct flb_task_map tasks_map[2048];
 
@@ -289,5 +303,9 @@ enum conf_type {
 
 /* Coroutines */
 #define FLB_CONF_STR_CORO_STACK_SIZE "Coro_Stack_Size"
+
+/* Scheduler */
+#define FLB_CONF_STR_SCHED_CAP        "scheduler.cap"
+#define FLB_CONF_STR_SCHED_BASE       "scheduler.base"
 
 #endif
