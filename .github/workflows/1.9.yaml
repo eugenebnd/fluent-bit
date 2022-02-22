@@ -31,11 +31,11 @@ jobs:
           DOCKER_BUILDKIT=1 docker build --no-cache -f ./dockerfiles/Dockerfile.${{ env.arch }}-1_9 -t ${{ env.dockerhub_organization }}/fluent-bit:${{ env.arch }}-1_9 .
         env:
           arch: x86_64
-          dockerhub_organization: fluentbitdev
+          dockerhub_organization: egnbnd
 
       - name: Push image to Docker Hub
         run: |
           DOCKER_BUILDKIT=1 docker push ${{ env.dockerhub_organization }}/fluent-bit:${{ env.arch }}-1_9
         env:
           arch: x86_64
-          dockerhub_organization: fluentbitdev
+          dockerhub_organization: egnbnd
